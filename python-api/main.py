@@ -42,11 +42,13 @@ class HealthResponse(BaseModel):
 
 class CreateTicketRequest(BaseModel):
     description: str = Field(..., min_length=10, max_length=1000, description="Ticket description")
+    category: Optional[str] = Field(None, description="Ticket category: Técnico, Facturación, Comercial, Otro")
 
 
 class CreateTicketResponse(BaseModel):
     ticket_id: str
     description: str
+    category: Optional[str]
     created_at: str
     processed: bool
     message: str
@@ -72,16 +74,16 @@ class ClassificationResult(BaseModel):
 
 
 async def classify_with_llm(description: str) -> ClassificationResult:
-    prompt = f"""Analyze this support ticket and classify it:
+    prompt = f"""Analiza este ticket de soporte y clasifícalo:
 
 Ticket: "{description}"
 
-Categories: Technical, Billing, Commercial, Other
-Sentiments: Positive, Neutral, Negative
+Categorías: Técnico, Facturación, Comercial, Otro
+Sentimientos: Positivo, Neutral, Negativo
 
-Response format:
-Category: [category]
-Sentiment: [sentiment]"""
+Formato de respuesta:
+Categoría: [categoría]
+Sentimiento: [sentimiento]"""
 
     API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
     
@@ -112,21 +114,21 @@ Sentiment: [sentiment]"""
 def parse_llm_response(text: str, description: str) -> ClassificationResult:
     text_lower = text.lower()
     
-    category = "Other"
-    if any(word in text_lower for word in ["technical", "técnico", "tecnico"]):
-        category = "Technical"
-    elif any(word in text_lower for word in ["billing", "facturación", "facturacion"]):
-        category = "Billing"
-    elif any(word in text_lower for word in ["commercial", "comercial"]):
-        category = "Commercial"
+    category = "Otro"
+    if any(word in text_lower for word in ["técnico", "tecnico", "technical"]):
+        category = "Técnico"
+    elif any(word in text_lower for word in ["facturación", "facturacion", "billing"]):
+        category = "Facturación"
+    elif any(word in text_lower for word in ["comercial", "commercial"]):
+        category = "Comercial"
     
     sentiment = "Neutral"
-    if any(word in text_lower for word in ["positive", "positivo", "good", "excellent"]):
-        sentiment = "Positive"
-    elif any(word in text_lower for word in ["negative", "negativo", "bad", "problem", "error"]):
-        sentiment = "Negative"
+    if any(word in text_lower for word in ["positivo", "positive", "bueno", "excelente", "good", "excellent"]):
+        sentiment = "Positivo"
+    elif any(word in text_lower for word in ["negativo", "negative", "malo", "problema", "error", "bad", "problem"]):
+        sentiment = "Negativo"
     
-    if category == "Other" or sentiment == "Neutral":
+    if category == "Otro" or sentiment == "Neutral":
         return fallback_classification(description)
     
     return ClassificationResult(category=category, sentiment=sentiment)
@@ -135,22 +137,22 @@ def parse_llm_response(text: str, description: str) -> ClassificationResult:
 def fallback_classification(description: str) -> ClassificationResult:
     text_lower = description.lower()
     
-    category = "Other"
-    if any(word in text_lower for word in ["error", "bug", "crash", "fail", "technical", "system"]):
-        category = "Technical"
-    elif any(word in text_lower for word in ["invoice", "payment", "bill", "charge", "price"]):
-        category = "Billing"
-    elif any(word in text_lower for word in ["purchase", "sale", "quote", "product", "service"]):
-        category = "Commercial"
+    category = "Otro"
+    if any(word in text_lower for word in ["error", "bug", "fallo", "crash", "fail", "technical", "sistema", "system"]):
+        category = "Técnico"
+    elif any(word in text_lower for word in ["factura", "invoice", "pago", "payment", "cobro", "bill", "charge", "precio", "price"]):
+        category = "Facturación"
+    elif any(word in text_lower for word in ["compra", "purchase", "venta", "sale", "cotización", "quote", "producto", "product", "servicio", "service"]):
+        category = "Comercial"
     
     sentiment = "Neutral"
-    negative_keywords = ["problem", "error", "issue", "broken", "urgent", "bad", "fail"]
-    positive_keywords = ["thanks", "excellent", "good", "perfect", "happy", "great"]
+    negative_keywords = ["problema", "problem", "error", "fallo", "issue", "roto", "broken", "urgente", "urgent", "malo", "bad", "fail"]
+    positive_keywords = ["gracias", "thanks", "excelente", "excellent", "bueno", "good", "perfecto", "perfect", "feliz", "happy", "genial", "great"]
     
     if any(word in text_lower for word in negative_keywords):
-        sentiment = "Negative"
+        sentiment = "Negativo"
     elif any(word in text_lower for word in positive_keywords):
-        sentiment = "Positive"
+        sentiment = "Positivo"
     
     return ClassificationResult(category=category, sentiment=sentiment)
 
@@ -192,6 +194,7 @@ async def create_ticket(request: CreateTicketRequest):
     try:
         new_ticket = {
             "description": request.description,
+            "category": request.category,
             "processed": False
         }
         
@@ -208,6 +211,7 @@ async def create_ticket(request: CreateTicketRequest):
         return CreateTicketResponse(
             ticket_id=ticket["id"],
             description=ticket["description"],
+            category=ticket.get("category"),
             created_at=ticket["created_at"],
             processed=ticket["processed"],
             message="Ticket created successfully. Will be processed by automation."
