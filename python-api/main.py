@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from typing import Optional
@@ -49,6 +50,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(TicketAlreadyProcessedError)
+async def ticket_already_processed_handler(request, exc: TicketAlreadyProcessedError):
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={"detail": "Ticket was already processed"}
+    )
+
+@app.exception_handler(BusinessError)
+async def business_error_handler(request, exc: BusinessError):
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"detail": str(exc)}
+    )
+
 
 class HealthResponse(BaseModel):
     status: str
@@ -183,19 +199,21 @@ def validate_classification(result: ClassificationResult) -> bool:
     valid_sentiments = ["Positivo", "Neutral", "Negativo"]
     return result.category in valid_categories and result.sentiment in valid_sentiments
 
-def check_ticket_already_processed(ticket_id: str) -> bool:
+def check_ticket_already_processed(ticket_id: str):
     try:
         response = supabase.table("tickets").select("processed").eq("id", ticket_id).execute()
         if response.data and response.data[0].get("processed"):
-            return True
-        return False
+            raise TicketAlreadyProcessedError(f"Ticket {ticket_id} was already processed")
+    except TicketAlreadyProcessedError:
+        raise
     except Exception as e:
         logger.error(f"Error checking ticket status: {e}")
-        return False
+
 
 def check_huggingface_api() -> bool:
     try:
-        test_result = fallback_classification("test")
+        test_chain = prompt_template | llm
+        test_chain.invoke({"description": "test"})
         return True
     except Exception as e:
         logger.error(f"HuggingFace API unreachable: {e}")
@@ -294,8 +312,12 @@ async def create_ticket(request: CreateTicketRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"[{request_id}] Error creating ticket: {e}")
-        raise HTTPException(status_code=500, detail="An error occurred while creating the ticket")
+        logger.exception(f"[{request_id}] Unexpected error creating ticket") 
+        raise HTTPException(
+            status_code=500, 
+            detail="Internal server error",
+            headers={"X-Request-ID": request_id}
+        )
 
 @app.post("/process-ticket", response_model=ProcessTicketResponse, status_code=status.HTTP_200_OK, tags=["Tickets"])
 async def process_ticket(request: ProcessTicketRequest):
@@ -304,12 +326,7 @@ async def process_ticket(request: ProcessTicketRequest):
     try:
         logger.info(f"[{request_id}] Processing ticket: {request.ticket_id}")
         
-        if check_ticket_already_processed(request.ticket_id):
-            logger.warning(f"[{request_id}] Ticket already processed: {request.ticket_id}")
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Ticket was already processed"
-            )
+        check_ticket_already_processed(request.ticket_id)
         
         response = supabase.table("tickets").select("*").eq("id", request.ticket_id).execute()
         
