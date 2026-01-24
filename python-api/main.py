@@ -5,7 +5,9 @@ from dotenv import load_dotenv
 from typing import Optional
 import os
 import logging
+import uuid
 from supabase import create_client, Client
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from langchain_huggingface import HuggingFaceEndpoint
 from langchain_core.prompts import PromptTemplate
@@ -16,10 +18,18 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+class BusinessError(Exception):
+    pass
+
+class TicketAlreadyProcessedError(BusinessError):
+    pass
+
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 PORT = int(os.getenv("PORT", 8000))
+LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", 30))
+MAX_RETRIES = int(os.getenv("MAX_RETRIES", 3))
 
 if not all([SUPABASE_URL, SUPABASE_KEY, HUGGINGFACE_API_KEY]):
     raise ValueError("Missing environment variables in .env")
@@ -44,6 +54,7 @@ class HealthResponse(BaseModel):
     status: str
     supabase_connected: bool
     huggingface_configured: bool
+    huggingface_reachable: Optional[bool] = False
 
 class CreateTicketRequest(BaseModel):
     description: str = Field(..., min_length=10, max_length=1000)
@@ -56,6 +67,7 @@ class CreateTicketResponse(BaseModel):
     created_at: str
     processed: bool
     message: str
+    request_id: Optional[str] = None
 
 class ProcessTicketRequest(BaseModel):
     ticket_id: str = Field(..., description="UUID of existing ticket")
@@ -67,6 +79,7 @@ class ProcessTicketResponse(BaseModel):
     sentiment: str
     processed: bool
     message: str
+    request_id: Optional[str] = None
 
 class ClassificationResult(BaseModel):
     category: str = Field(description="Una de: Técnico, Facturación, Comercial, Otro")
@@ -76,7 +89,8 @@ llm = HuggingFaceEndpoint(
     repo_id="mistralai/Mistral-7B-Instruct-v0.2",
     huggingfacehub_api_token=HUGGINGFACE_API_KEY,
     temperature=0.2,
-    max_new_tokens=200
+    max_new_tokens=200,
+    timeout=LLM_TIMEOUT
 )
 
 parser = PydanticOutputParser(pydantic_object=ClassificationResult)
@@ -164,21 +178,49 @@ def fallback_classification(description: str) -> ClassificationResult:
     
     return ClassificationResult(category=category, sentiment=sentiment)
 
-
-def classify_with_llm(description: str) -> ClassificationResult:
+def validate_classification(result: ClassificationResult) -> bool:
     valid_categories = ["Técnico", "Facturación", "Comercial", "Otro"]
     valid_sentiments = ["Positivo", "Neutral", "Negativo"]
-    
+    return result.category in valid_categories and result.sentiment in valid_sentiments
+
+def check_ticket_already_processed(ticket_id: str) -> bool:
+    try:
+        response = supabase.table("tickets").select("processed").eq("id", ticket_id).execute()
+        if response.data and response.data[0].get("processed"):
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Error checking ticket status: {e}")
+        return False
+
+def check_huggingface_api() -> bool:
+    try:
+        test_result = fallback_classification("test")
+        return True
+    except Exception as e:
+        logger.error(f"HuggingFace API unreachable: {e}")
+        return False
+
+@retry(
+    stop=stop_after_attempt(MAX_RETRIES),
+    wait=wait_exponential(multiplier=1, min=2, max=10)
+)
+def classify_with_llm_retry(description: str) -> ClassificationResult:
     try:
         result = classification_chain.invoke({"description": description})
-        
-        if result.category not in valid_categories or result.sentiment not in valid_sentiments:
-            logger.warning(f"Invalid classification: {result}, using fallback")
+        if not validate_classification(result):
+            logger.warning(f"Invalid classification, using fallback")
             return fallback_classification(description)
-            
         return result
     except Exception as e:
         logger.error(f"LangChain error: {e}, using fallback")
+        return fallback_classification(description)
+
+def classify_with_llm(description: str) -> ClassificationResult:
+    try:
+        return classify_with_llm_retry(description)
+    except Exception as e:
+        logger.error(f"All retries failed: {e}, using fallback")
         return fallback_classification(description)
 
 @app.get("/", tags=["Health"])
@@ -205,16 +247,25 @@ async def health_check():
         logger.error(f"Supabase health check failed: {e}")
     
     hf_ok = bool(HUGGINGFACE_API_KEY and HUGGINGFACE_API_KEY.startswith("hf_"))
+    hf_reachable = False
+    
+    if hf_ok:
+        hf_reachable = check_huggingface_api()
     
     return HealthResponse(
-        status="healthy" if (supabase_ok and hf_ok) else "degraded",
+        status="healthy" if (supabase_ok and hf_ok and hf_reachable) else "degraded",
         supabase_connected=supabase_ok,
-        huggingface_configured=hf_ok
+        huggingface_configured=hf_ok,
+        huggingface_reachable=hf_reachable
     )
 
 @app.post("/create_ticket", response_model=CreateTicketResponse, status_code=status.HTTP_201_CREATED, tags=["Tickets"])
 async def create_ticket(request: CreateTicketRequest):
+    request_id = str(uuid.uuid4())
+    
     try:
+        logger.info(f"[{request_id}] Creating ticket")
+        
         new_ticket = {
             "description": request.description,
             "processed": False
@@ -227,6 +278,8 @@ async def create_ticket(request: CreateTicketRequest):
         
         ticket = response.data[0]
         
+        logger.info(f"[{request_id}] Ticket created: {ticket['id']}")
+        
         return CreateTicketResponse(
             ticket_id=ticket["id"],
             description=ticket["description"],
@@ -234,22 +287,34 @@ async def create_ticket(request: CreateTicketRequest):
             sentiment=ticket.get("sentiment"),
             created_at=ticket["created_at"],
             processed=ticket["processed"],
-            message="Ticket created successfully. Will be processed by automation."
+            message="Ticket created successfully. Will be processed by automation.",
+            request_id=request_id
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error creating ticket: {e}")
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+        logger.error(f"[{request_id}] Error creating ticket: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while creating the ticket")
 
 @app.post("/process-ticket", response_model=ProcessTicketResponse, status_code=status.HTTP_200_OK, tags=["Tickets"])
 async def process_ticket(request: ProcessTicketRequest):
+    request_id = str(uuid.uuid4())
+    
     try:
+        logger.info(f"[{request_id}] Processing ticket: {request.ticket_id}")
+        
+        if check_ticket_already_processed(request.ticket_id):
+            logger.warning(f"[{request_id}] Ticket already processed: {request.ticket_id}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Ticket was already processed"
+            )
+        
         response = supabase.table("tickets").select("*").eq("id", request.ticket_id).execute()
         
         if not response.data:
-            raise HTTPException(status_code=404, detail=f"Ticket {request.ticket_id} not found")
+            raise HTTPException(status_code=404, detail="Ticket not found")
         
         ticket = response.data[0]
         
@@ -263,7 +328,7 @@ async def process_ticket(request: ProcessTicketRequest):
         
         supabase.table("tickets").update(update_data).eq("id", ticket["id"]).execute()
         
-        logger.info(f"Ticket {ticket['id']} processed: {classification.category} / {classification.sentiment}")
+        logger.info(f"[{request_id}] Ticket processed: {classification.category}/{classification.sentiment}")
         
         return ProcessTicketResponse(
             ticket_id=ticket["id"],
@@ -271,14 +336,15 @@ async def process_ticket(request: ProcessTicketRequest):
             category=classification.category,
             sentiment=classification.sentiment,
             processed=True,
-            message="Ticket processed successfully with LangChain"
+            message="Ticket processed successfully with LangChain",
+            request_id=request_id
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error processing ticket: {e}")
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+        logger.error(f"[{request_id}] Error processing ticket: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while processing the ticket")
 
 if __name__ == "__main__":
     import uvicorn
