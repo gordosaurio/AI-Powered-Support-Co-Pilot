@@ -99,23 +99,71 @@ def fallback_classification(description: str) -> ClassificationResult:
     text_lower = description.lower()
     
     category = "Otro"
-    if any(word in text_lower for word in ["error", "bug", "fallo", "crash", "sistema", "técnico", "conexión"]):
+    
+    technical_words = [
+        "error", "bug", "fallo", "falla", "crash", "sistema", "técnico", "conexión",
+        "servidor", "base de datos", "código", "aplicación", "app", "software",
+        "hardware", "red", "internet", "wifi", "lento", "carga", "timeout",
+        "caído", "caída", "inaccesible", "bloqueado", "congelado", "pantalla",
+        "login", "contraseña", "acceso", "sesión", "actualización", "versión",
+        "instalación", "configuración", "integración", "api", "endpoint"
+    ]
+    
+    billing_words = [
+        "factura", "pago", "cobro", "precio", "dinero", "cargo", "tarjeta",
+        "débito", "crédito", "cuenta", "saldo", "balance", "transacción",
+        "reembolso", "devolución", "cuota", "mensualidad", "suscripción",
+        "renovación", "cancelación", "descuento", "promoción", "iva", "impuesto",
+        "recibo", "comprobante", "invoice", "billing", "payment", "refund",
+        "currency", "moneda", "divisa", "total", "subtotal", "monto"
+    ]
+    
+    commercial_words = [
+        "compra", "venta", "cotización", "producto", "pedido", "orden",
+        "envío", "entrega", "delivery", "shipping", "stock", "inventario",
+        "disponibilidad", "agotado", "catálogo", "tienda", "carrito",
+        "checkout", "cliente", "proveedor", "distribuidor", "almacén",
+        "logística", "tracking", "rastreo", "devolución", "garantía",
+        "cambio", "servicio", "atención", "asesoría", "consulta", "presupuesto",
+        "oferta", "demostración", "demo", "prueba", "muestra"
+    ]
+    
+    if any(word in text_lower for word in technical_words):
         category = "Técnico"
-    elif any(word in text_lower for word in ["factura", "pago", "cobro", "precio", "dinero", "cargo"]):
+    elif any(word in text_lower for word in billing_words):
         category = "Facturación"
-    elif any(word in text_lower for word in ["compra", "venta", "cotización", "producto", "pedido", "orden"]):
+    elif any(word in text_lower for word in commercial_words):
         category = "Comercial"
     
     sentiment = "Neutral"
-    negative = ["problema", "error", "fallo", "urgente", "malo", "terrible", "pesimo", "no funciona"]
-    positive = ["gracias", "excelente", "bueno", "perfecto", "genial", "bien", "funciona"]
     
-    if any(word in text_lower for word in negative):
+    negative_words = [
+        "problema", "error", "fallo", "falla", "urgente", "malo", "terrible",
+        "pésimo", "no funciona", "no sirve", "no puedo", "imposible", "frustrado",
+        "molesto", "enojado", "crítico", "grave", "serio", "bloqueado",
+        "perdido", "confundido", "lento", "demora", "retraso", "tardío",
+        "incorrecto", "equivocado", "defectuoso", "roto", "dañado", "inútil",
+        "horrible", "desastre", "caos", "inaceptable", "deficiente", "pobre",
+        "decepcionado", "insatisfecho", "queja", "reclamo"
+    ]
+    
+    positive_words = [
+        "gracias", "excelente", "bueno", "perfecto", "genial", "bien", "funciona",
+        "fantástico", "maravilloso", "increíble", "espectacular", "satisfecho",
+        "contento", "feliz", "encantado", "agradecido", "rápido", "eficiente",
+        "útil", "práctico", "fácil", "simple", "intuitivo", "claro", "efectivo",
+        "profesional", "amable", "cordial", "atento", "servicial", "resuelto",
+        "solucionado", "exitoso", "logrado", "cumplido", "recomiendo", "felicito",
+        "aprecio", "valoro", "admiro", "excepcional"
+    ]
+    
+    if any(word in text_lower for word in negative_words):
         sentiment = "Negativo"
-    elif any(word in text_lower for word in positive):
+    elif any(word in text_lower for word in positive_words):
         sentiment = "Positivo"
     
     return ClassificationResult(category=category, sentiment=sentiment)
+
 
 def classify_with_llm(description: str) -> ClassificationResult:
     valid_categories = ["Técnico", "Facturación", "Comercial", "Otro"]
