@@ -89,6 +89,18 @@ llm = HuggingFaceEndpoint(
 )
 ```
 
+> ⚠️ Nota sobre el proveedor de IA
+
+Actualmente el modelo LLM se consume mediante la HuggingFace Inference API en su modalidad gratuita.  
+Este servicio rota y limita dinámicamente los *providers* disponibles, por lo que:
+
+- En algunos momentos el LLM puede no estar disponible o devolver errores de compatibilidad de tarea.
+- Para evitar que el flujo de negocio se rompa, la API implementa un **mecanismo de fallback determinístico** que clasifica el ticket usando análisis léxico y reglas de negocio.
+- La respuesta de la API incluye el campo `classification_method` (`"LLM"` o `"FALLBACK"`) para poder medir y comparar el rendimiento de ambos enfoques.
+
+En un entorno productivo se recomienda conectar el servicio a un proveedor de IA estable (por ejemplo, OpenAI, Google Gemini o un modelo self-hosted) reutilizando la misma interfaz de clasificación.
+
+
 **Prompt Template (Instruction-Following):**
 ```python
 [INST] Clasifica este ticket de soporte en categoría y sentimiento.
@@ -353,6 +365,12 @@ Procesar y clasificar un ticket existente.
   "ticket_id": "uuid-del-ticket"
 }
 ```
+
+**Campo adicional:**
+
+- `classification_method`: `"LLM"` cuando la clasificación proviene del modelo de lenguaje,
+  `"FALLBACK"` cuando el LLM no está disponible y se utiliza la lógica determinística.
+
 
 **Response (200):**
 ```json
