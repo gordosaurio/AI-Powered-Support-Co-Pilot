@@ -1,0 +1,218 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "1dcf7361-5d5b-422b-8efc-981de25e0aa9",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -672,
+        0
+      ],
+      "id": "306424b4-b948-4c39-8946-ce428d806734",
+      "name": "Webhook",
+      "webhookId": "1dcf7361-5d5b-422b-8efc-981de25e0aa9",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ai-powered-support-co-pilot-production-c917.up.railway.app/process-ticket",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"ticket_id\": \"{{ $json.body.id }}\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -480,
+        0
+      ],
+      "id": "dcca35af-73d0-4754-b54a-bf92207d02ea",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.sentiment }}",
+                    "rightValue": "Negativo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "21b14264-ad92-4689-8be0-5f9e25799c26"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Negativo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "cf82b8e9-b54c-4a05-9efe-efdcfc2b1517",
+                    "leftValue": "={{ $json.sentiment }}",
+                    "rightValue": "Positivo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Positivo"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -272,
+        0
+      ],
+      "id": "438b12a0-9799-42e4-b2fc-300f1aa4c5ac",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "fromEmail": "af.mendozasilva@gmail.com",
+        "toEmail": "andres.santa-fe@hotmail.com",
+        "subject": "=Nuevo Ticket Urgente - {{ $json.category }}",
+        "html": "=<div style=\"max-width: 600px; margin: 0 auto; background-color: #fafafa; padding: 20px; border-radius: 12px;\">\n  <div style=\"background-color: #ff6b6b; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;\">\n    <h1 style=\"margin: 0; font-size: 24px;\">🚨 Ticket Urgente</h1>\n  </div>\n  \n  <div style=\"background-color: white; padding: 25px; border-radius: 0 0 8px 8px;\">\n    <p style=\"font-size: 16px; color: #555;\">Un usuario ha reportado la siguiente incidencia:</p>\n    \n    <div style=\"background-color: #ffe5e5; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 5px solid #ff6b6b;\">\n      <p style=\"font-size: 15px; color: #333; margin: 0; font-style: italic;\">{{ $json.description }}</p>\n    </div>\n    \n    <div style=\"background-color: white; padding: 20px; border-radius: 8px; margin-top: 20px; border: 1px solid #e0e0e0;\">\n      <h3 style=\"margin: 0 0 15px 0; font-size: 18px; color: #333; border-bottom: 2px solid #ff6b6b; padding-bottom: 10px;\">\n        📋 Detalles del Ticket\n      </h3>\n      \n      <table style=\"width: 100%; border-collapse: collapse;\">\n        <tr style=\"background-color: #ffe5e5;\">\n          <td style=\"padding: 12px; border: 1px solid #ffcdd2;\">\n            <span style=\"font-size: 18px;\">🆔</span> <strong style=\"color: #555;\">ID:</strong>\n          </td>\n          <td style=\"padding: 12px; border: 1px solid #ffcdd2; color: #333; font-family: monospace;\">\n            {{ $json.ticket_id }}\n          </td>\n        </tr>\n        <tr style=\"background-color: #ffe5e5;\">\n          <td style=\"padding: 12px; border: 1px solid #ffcdd2;\">\n            <span style=\"font-size: 18px;\">📁</span> <strong style=\"color: #555;\">Categoría:</strong>\n          </td>\n          <td style=\"padding: 12px; border: 1px solid #ffcdd2; color: #333;\">\n            {{ $json.category }}\n          </td>\n        </tr>\n        <tr style=\"background-color: #ffe5e5;\">\n          <td style=\"padding: 12px; border: 1px solid #ffcdd2;\">\n            <span style=\"font-size: 18px;\">😟</span> <strong style=\"color: #555;\">Sentimiento:</strong>\n          </td>\n          <td style=\"padding: 12px; border: 1px solid #ffcdd2;\">\n            <span style=\"background-color: #ff6b6b; color: white; padding: 5px 15px; border-radius: 15px; font-size: 13px; font-weight: bold; display: inline-block;\">\n              Negativo\n            </span>\n          </td>\n        </tr>\n      </table>\n    </div>\n    \n    <p style=\"text-align: center; margin-top: 20px; color: #d32f2f; font-weight: bold;\">\n      ⚠️ Por favor, atienda este ticket a la brevedad posible\n    </p>\n  </div>\n</div>\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        -64,
+        -96
+      ],
+      "id": "cfc93392-9c1d-4850-8384-9b8fbdbace4d",
+      "name": "Send email",
+      "webhookId": "299600ab-33e9-4b9e-af31-232308f826a8",
+      "credentials": {
+        "smtp": {
+          "id": "rPcphL1LraRO6wRZ",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "af.mendozasilva@gmail.com",
+        "toEmail": "andres.santa-fe@hotmail.com",
+        "subject": "=Cliente Satisfecho - {{ $json.category }}",
+        "html": "=<div style=\"max-width: 600px; margin: 0 auto; background-color: #fafafa; padding: 20px; border-radius: 12px;\">\n  <div style=\"background-color: #4caf50; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;\">\n    <h1 style=\"margin: 0; font-size: 24px;\">🎉 ¡Felicitaciones!</h1>\n  </div>\n  \n  <div style=\"background-color: white; padding: 25px; border-radius: 0 0 8px 8px;\">\n    <p style=\"font-size: 16px; color: #555;\">Un cliente ha compartido su experiencia positiva:</p>\n    \n    <div style=\"background-color: #f1f8e9; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 5px solid #4caf50;\">\n      <p style=\"font-size: 15px; color: #333; margin: 0; font-style: italic;\">{{ $json.description }}</p>\n    </div>\n    \n    <div style=\"background-color: white; padding: 20px; border-radius: 8px; margin-top: 20px; border: 1px solid #e0e0e0;\">\n      <h3 style=\"margin: 0 0 15px 0; font-size: 18px; color: #333; border-bottom: 2px solid #4caf50; padding-bottom: 10px;\">\n        📋 Detalles del Ticket\n      </h3>\n      \n      <table style=\"width: 100%; border-collapse: collapse;\">\n        <tr style=\"background-color: #f1f8e9;\">\n          <td style=\"padding: 12px; border: 1px solid #c8e6c9;\">\n            <span style=\"font-size: 18px;\">🆔</span> <strong style=\"color: #555;\">ID:</strong>\n          </td>\n          <td style=\"padding: 12px; border: 1px solid #c8e6c9; color: #333; font-family: monospace;\">\n            {{ $json.ticket_id }}\n          </td>\n        </tr>\n        <tr style=\"background-color: #f1f8e9;\">\n          <td style=\"padding: 12px; border: 1px solid #c8e6c9;\">\n            <span style=\"font-size: 18px;\">📁</span> <strong style=\"color: #555;\">Categoría:</strong>\n          </td>\n          <td style=\"padding: 12px; border: 1px solid #c8e6c9; color: #333;\">\n            {{ $json.category }}\n          </td>\n        </tr>\n        <tr style=\"background-color: #f1f8e9;\">\n          <td style=\"padding: 12px; border: 1px solid #c8e6c9;\">\n            <span style=\"font-size: 18px;\">😊</span> <strong style=\"color: #555;\">Sentimiento:</strong>\n          </td>\n          <td style=\"padding: 12px; border: 1px solid #c8e6c9;\">\n            <span style=\"background-color: #4caf50; color: white; padding: 5px 15px; border-radius: 15px; font-size: 13px; font-weight: bold; display: inline-block;\">\n              Positivo\n            </span>\n          </td>\n        </tr>\n      </table>\n    </div>\n    \n    <p style=\"text-align: center; margin-top: 20px; color: #388e3c; font-weight: bold;\">\n      ¡Sigan brindando este nivel de servicio!\n    </p>\n  </div>\n</div>\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        -64,
+        96
+      ],
+      "id": "40d74a4e-d296-4ed3-b1c9-4919e02571bf",
+      "name": "Send email1",
+      "webhookId": "cb119393-dacb-48ae-a125-67ad70f9a252",
+      "credentials": {
+        "smtp": {
+          "id": "rPcphL1LraRO6wRZ",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Send email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "e263aef2-a6a6-4ad9-8313-fda1435c4943",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4489bf1cbc226cddc7a9f2eae192afccc94371f6cfd4e1dd19028e6feb108683"
+  },
+  "id": "9BMMNmg0w7ls0qN7qh9v3",
+  "tags": []
+}
