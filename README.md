@@ -481,7 +481,6 @@ SOFTWARE.
 
 <div align="center">
 
-**Desarrollado con ❤️ para la prueba técnica de Full-Stack AI Engineer en VIVETORI**
 
 [⬆ Volver arriba](#ai-powered-support-co-pilot)
 
