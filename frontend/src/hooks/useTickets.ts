@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Ticket } from '../types/ticket'
 
@@ -7,61 +7,39 @@ export function useTickets() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchTickets()
-    subscribeToTickets()
-  }, [])
-
-  async function fetchTickets() {
+  const fetchTickets = async () => {
     try {
+      setLoading(true)
       const { data, error: fetchError } = await supabase
         .from('tickets')
         .select('*')
         .order('created_at', { ascending: false })
 
       if (fetchError) throw fetchError
-      
+
       setTickets(data || [])
-      setLoading(false)
+      setError(null)
     } catch (err) {
-      console.error('Error fetching tickets:', err)
-      setError('Error al cargar los tickets')
+      setError(err instanceof Error ? err.message : 'Error al cargar tickets')
+    } finally {
       setLoading(false)
     }
   }
 
-  function subscribeToTickets() {
-    const channel = supabase
-      .channel('tickets-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tickets'
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setTickets((prev) => [payload.new as Ticket, ...prev])
-          } else if (payload.eventType === 'UPDATE') {
-            setTickets((prev) =>
-              prev.map((ticket) =>
-                ticket.id === payload.new.id ? (payload.new as Ticket) : ticket
-              )
-            )
-          } else if (payload.eventType === 'DELETE') {
-            setTickets((prev) =>
-              prev.filter((ticket) => ticket.id !== payload.old.id)
-            )
-          }
-        }
-      )
+  useEffect(() => {
+    fetchTickets()
+
+    const subscription = supabase
+      .channel('tickets-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => {
+        fetchTickets()
+      })
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      subscription.unsubscribe()
     }
-  }
+  }, [])
 
-  return { tickets, loading, error }
+  return { tickets, loading, error, refetch: fetchTickets }
 }

@@ -1,9 +1,16 @@
+import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { TicketList } from './components/TicketList'
+import { CreateTicketModal } from './components/CreateTicketModal'
 import { useTickets } from './hooks/useTickets'
 
 function App() {
-  const { tickets, loading, error } = useTickets()
+  const { tickets, loading, error, refetch } = useTickets()
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  const handleSuccess = () => {
+    refetch()
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
@@ -21,7 +28,10 @@ function App() {
         </header>
 
         <div className="flex justify-center mb-16">
-          <button className="group bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-semibold py-4 px-10 rounded-2xl transition-all duration-300 flex items-center gap-3 shadow-xl hover:shadow-2xl hover:scale-105 transform">
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="group bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-semibold py-4 px-10 rounded-2xl transition-all duration-300 flex items-center gap-3 shadow-xl hover:shadow-2xl hover:scale-105 transform"
+          >
             <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" strokeWidth={2.5} />
             <span className="text-lg">Crear Ticket</span>
           </button>
@@ -29,6 +39,12 @@ function App() {
 
         <TicketList tickets={tickets} loading={loading} error={error} />
       </div>
+
+      <CreateTicketModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={handleSuccess}
+      />
     </div>
   )
 }
