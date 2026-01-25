@@ -1,5 +1,6 @@
-import { TicketCard } from './TicketCard'
 import type { Ticket } from '../types/ticket'
+import { TicketCard } from './TicketCard'
+import { Loader2, AlertCircle, Inbox } from 'lucide-react'
 
 interface TicketListProps {
   tickets: Ticket[]
@@ -10,39 +11,35 @@ interface TicketListProps {
 export function TicketList({ tickets, loading, error }: TicketListProps) {
   if (loading) {
     return (
-      <div className="text-center py-20">
-        <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent"></div>
-        <p className="mt-6 text-gray-600 text-lg">Cargando tickets...</p>
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="w-12 h-12 text-teal-600 animate-spin mb-4" />
+        <p className="text-slate-600 text-lg font-medium">Cargando tickets...</p>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="flex justify-center">
-        <div className="max-w-2xl bg-red-50 border border-red-200 rounded-2xl p-6 text-red-700">
-          <p className="font-medium">{error}</p>
-        </div>
+      <div className="flex flex-col items-center justify-center py-20 bg-rose-50 rounded-3xl border border-rose-200">
+        <AlertCircle className="w-16 h-16 text-rose-500 mb-4" />
+        <p className="text-rose-700 text-lg font-semibold mb-2">Error al cargar tickets</p>
+        <p className="text-rose-600 text-sm">{error}</p>
       </div>
     )
   }
 
   if (tickets.length === 0) {
     return (
-      <div className="text-center py-20">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 mb-6">
-          <svg className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        </div>
-        <p className="text-xl text-gray-900 font-medium mb-2">No hay tickets</p>
-        <p className="text-gray-500">Crea uno para comenzar</p>
+      <div className="flex flex-col items-center justify-center py-20 bg-slate-50 rounded-3xl border border-slate-200">
+        <Inbox className="w-16 h-16 text-slate-400 mb-4" />
+        <p className="text-slate-600 text-lg font-medium">No hay tickets disponibles</p>
+        <p className="text-slate-500 text-sm mt-2">Crea tu primer ticket para comenzar</p>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-wrap justify-center gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
       {tickets.map((ticket) => (
         <TicketCard key={ticket.id} ticket={ticket} />
       ))}

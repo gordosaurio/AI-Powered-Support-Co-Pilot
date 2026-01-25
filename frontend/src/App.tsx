@@ -6,22 +6,24 @@ function App() {
   const { tickets, loading, error } = useTickets()
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-slate-50/30 to-white/50 pointer-events-none" />
+      
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
         
-        <header className="text-center mb-12">
-          <h1 className="text-center text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 mb-3">
-            Sistema de Tickets
+        <header className="text-center mb-16 sm:mb-20">
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-slate-900 mb-6 tracking-tight">
+            Sistema de <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 via-emerald-500 to-lime-500">Tickets</span>
           </h1>
-          <p className="text-lg text-gray-600">
+          <p className="text-xl sm:text-2xl text-slate-600 font-light max-w-3xl mx-auto leading-relaxed">
             Gestión inteligente de soporte con IA
           </p>
         </header>
 
-        <div className="flex justify-center mb-12">
-          <button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium py-4 px-8 rounded-xl transition-all duration-200 flex items-center gap-3 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-0.5">
-            <Plus className="w-5 h-5" strokeWidth={2.5} />
-            <span>Crear Ticket</span>
+        <div className="flex justify-center mb-16">
+          <button className="group bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-semibold py-4 px-10 rounded-2xl transition-all duration-300 flex items-center gap-3 shadow-xl hover:shadow-2xl hover:scale-105 transform">
+            <Plus className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" strokeWidth={2.5} />
+            <span className="text-lg">Crear Ticket</span>
           </button>
         </div>
 
