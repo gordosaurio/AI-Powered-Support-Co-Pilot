@@ -466,7 +466,8 @@ SOFTWARE.
 
 - 📧 Email: andres.santa-fe@hotmail.com
 - 🐙 GitHub: [@gordosaurio](https://github.com/gordosaurio)
-- 💼 LinkedIn: [Andrés Mendoza](https://linkedin.com/in/andres-mendoza)
+- 💼 LinkedIn: [Andrés Mendoza](https://www.linkedin.com/in/andres-felipe-mendoza-silva-341a06329)
+
 
 ## 🙏 Agradecimientos
 
