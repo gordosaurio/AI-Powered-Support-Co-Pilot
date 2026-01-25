@@ -153,9 +153,9 @@ def fallback_classification(description: str) -> ClassificationResult:
         "envío", "entrega", "delivery", "shipping", "stock", "inventario",
         "disponibilidad", "agotado", "catálogo", "tienda", "carrito",
         "checkout", "cliente", "proveedor", "distribuidor", "almacén",
-        "logística", "tracking", "rastreo", "devolución", "garantía",
+        "logística", "tracking", "rastreo", "garantía",
         "cambio", "servicio", "atención", "asesoría", "consulta", "presupuesto",
-        "oferta", "demostración", "demo", "prueba", "muestra"
+        "oferta", "demostración", "demo", "prueba", "muestra", "soporte"
     ]
     
     if any(word in text_lower for word in technical_words):
@@ -167,32 +167,62 @@ def fallback_classification(description: str) -> ClassificationResult:
     
     sentiment = "Neutral"
     
-    negative_words = [
-        "problema", "error", "fallo", "falla", "urgente", "malo", "terrible",
-        "pésimo", "no funciona", "no sirve", "no puedo", "imposible", "frustrado",
-        "molesto", "enojado", "crítico", "grave", "serio", "bloqueado",
-        "perdido", "confundido", "lento", "demora", "retraso", "tardío",
-        "incorrecto", "equivocado", "defectuoso", "roto", "dañado", "inútil",
-        "horrible", "desastre", "caos", "inaceptable", "deficiente", "pobre",
-        "decepcionado", "insatisfecho", "queja", "reclamo"
+    positive_resolution_phrases = [
+        "resolví mi problema", "resolvió mi problema", "problema resuelto",
+        "problema solucionado", "muchas gracias", "muchísimas gracias",
+        "excelente servicio", "excelente trabajo", "excelente atención",
+        "muy profesional", "muy satisfecho", "estoy encantado",
+        "definitivamente recomendaré", "recomendaré la plataforma"
+    ]
+    
+    strong_positive_words = [
+        "excelente", "excepcional", "fantástico", "maravilloso", "increíble",
+        "espectacular", "encantado", "felicito", "muchísimas", "definitivamente"
     ]
     
     positive_words = [
-        "gracias", "excelente", "bueno", "perfecto", "genial", "bien", "funciona",
-        "fantástico", "maravilloso", "increíble", "espectacular", "satisfecho",
-        "contento", "feliz", "encantado", "agradecido", "rápido", "eficiente",
+        "gracias", "bueno", "perfecto", "genial", "bien", "funciona",
+        "satisfecho", "contento", "feliz", "agradecido", "rápido", "eficiente",
         "útil", "práctico", "fácil", "simple", "intuitivo", "claro", "efectivo",
         "profesional", "amable", "cordial", "atento", "servicial", "resuelto",
-        "solucionado", "exitoso", "logrado", "cumplido", "recomiendo", "felicito",
-        "aprecio", "valoro", "admiro", "excepcional"
+        "solucionado", "exitoso", "logrado", "cumplido", "recomiendo",
+        "aprecio", "valoro", "admiro", "tiempo récord"
     ]
     
-    if any(word in text_lower for word in negative_words):
-        sentiment = "Negativo"
-    elif any(word in text_lower for word in positive_words):
+    strong_negative_words = [
+        "urgente", "caído", "caída", "perdiendo dinero", "inaceptable",
+        "desastre", "caos", "crítico", "grave", "bloqueado", "paralizado"
+    ]
+    
+    negative_words = [
+        "error", "fallo", "falla", "malo", "terrible", "pésimo",
+        "no funciona", "no sirve", "no puedo", "imposible", "frustrado",
+        "molesto", "enojado", "serio", "perdido", "confundido",
+        "lento", "demora", "retraso", "tardío", "incorrecto", "equivocado",
+        "defectuoso", "roto", "dañado", "inútil", "horrible",
+        "deficiente", "pobre", "decepcionado", "insatisfecho", "queja", "reclamo"
+    ]
+    
+    has_positive_resolution = any(phrase in text_lower for phrase in positive_resolution_phrases)
+    strong_positive_count = sum(1 for word in strong_positive_words if word in text_lower)
+    positive_count = sum(1 for word in positive_words if word in text_lower)
+    strong_negative_count = sum(1 for word in strong_negative_words if word in text_lower)
+    negative_count = sum(1 for word in negative_words if word in text_lower)
+    
+    if has_positive_resolution or strong_positive_count >= 2:
         sentiment = "Positivo"
+    elif strong_negative_count >= 2 or (negative_count > positive_count + 3):
+        sentiment = "Negativo"
+    elif positive_count > negative_count:
+        sentiment = "Positivo"
+    elif negative_count > positive_count + 1:
+        sentiment = "Negativo"
+    
+    logger.info(f"Fallback classification: pos={positive_count}, neg={negative_count}, strong_pos={strong_positive_count}, strong_neg={strong_negative_count}, resolution={has_positive_resolution} -> {sentiment}")
     
     return ClassificationResult(category=category, sentiment=sentiment)
+
+
 
 def validate_classification(result: ClassificationResult) -> bool:
     valid_categories = ["Técnico", "Facturación", "Comercial", "Otro"]

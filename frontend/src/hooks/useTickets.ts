@@ -20,6 +20,7 @@ export function useTickets() {
       setTickets(data || [])
       setError(null)
     } catch (err) {
+      console.error('Error fetching tickets:', err)
       setError(err instanceof Error ? err.message : 'Error al cargar tickets')
     } finally {
       setLoading(false)
@@ -29,15 +30,26 @@ export function useTickets() {
   useEffect(() => {
     fetchTickets()
 
-    const subscription = supabase
-      .channel('tickets-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => {
-        fetchTickets()
+    const channel = supabase
+      .channel('tickets-realtime-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tickets'
+        },
+        (payload) => {
+          console.log('📡 Realtime event received:', payload)
+          fetchTickets()
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Subscription status:', status)
       })
-      .subscribe()
 
     return () => {
-      subscription.unsubscribe()
+      supabase.removeChannel(channel)
     }
   }, [])
 
